@@ -111,6 +111,7 @@ DEFAULT_LLM_PROVIDER = os.environ.get("MEM0_DEFAULT_LLM_PROVIDER", "openai")
 DEFAULT_LLM_MODEL = os.environ.get("MEM0_DEFAULT_LLM_MODEL", "gpt-4.1-nano-2025-04-14")
 DEFAULT_EMBEDDER_PROVIDER = os.environ.get("MEM0_DEFAULT_EMBEDDER_PROVIDER", "openai")
 DEFAULT_EMBEDDER_MODEL = os.environ.get("MEM0_DEFAULT_EMBEDDER_MODEL", "text-embedding-3-small")
+DEFAULT_EMBEDDING_DIMS = int(os.environ.get("MEM0_DEFAULT_EMBEDDING_DIMS", "1024"))
 
 def _validate_provider(kind: str, provider: str, allowed: tuple) -> None:
     if provider not in allowed:
@@ -138,6 +139,7 @@ DEFAULT_CONFIG = {
             "user": POSTGRES_USER,
             "password": POSTGRES_PASSWORD,
             "collection_name": POSTGRES_COLLECTION_NAME,
+            "embedding_model_dims": DEFAULT_EMBEDDING_DIMS,
         },
     },
     "llm": {
@@ -146,7 +148,11 @@ DEFAULT_CONFIG = {
     },
     "embedder": {
         "provider": DEFAULT_EMBEDDER_PROVIDER,
-        "config": {"model": DEFAULT_EMBEDDER_MODEL},
+        "config": {
+            "model": DEFAULT_EMBEDDER_MODEL,
+            "embedding_dims": DEFAULT_EMBEDDING_DIMS,
+            "lmstudio_base_url": os.environ.get("LMSTUDIO_BASE_URL"),
+        },
     },
     "history_db_path": HISTORY_DB_PATH,
 }

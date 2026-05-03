@@ -39,11 +39,14 @@ export const AuthContext = createContext<AuthContextValue>({
 });
 
 async function storeRefreshToken(refreshToken: string) {
-  await fetch("/api/auth/refresh", {
+  const res = await fetch("/api/auth/refresh", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ refresh_token: refreshToken }),
   });
+  if (!res.ok) {
+    throw new Error(`Failed to store refresh token (status ${res.status})`);
+  }
 }
 
 async function clearRefreshToken() {
