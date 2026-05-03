@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import os
 import time
@@ -109,10 +110,12 @@ HISTORY_DB_PATH = os.environ.get("HISTORY_DB_PATH", "/app/history/history.db")
 
 DEFAULT_LLM_PROVIDER = os.environ.get("MEM0_DEFAULT_LLM_PROVIDER", "openai")
 DEFAULT_LLM_MODEL = os.environ.get("MEM0_DEFAULT_LLM_MODEL", "gpt-4.1-nano-2025-04-14")
-DEFAULT_LLM_ENABLE_THINKING = os.environ.get("MEM0_LLM_ENABLE_THINKING")
 DEFAULT_EMBEDDER_PROVIDER = os.environ.get("MEM0_DEFAULT_EMBEDDER_PROVIDER", "openai")
 DEFAULT_EMBEDDER_MODEL = os.environ.get("MEM0_DEFAULT_EMBEDDER_MODEL", "text-embedding-3-small")
 DEFAULT_EMBEDDING_DIMS = int(os.environ.get("MEM0_DEFAULT_EMBEDDING_DIMS", "1024"))
+
+_LLM_EXTRA_PARAMS = os.environ.get("MEM0_LLM_EXTRA_PARAMS")
+_EMBEDDER_EXTRA_PARAMS = os.environ.get("MEM0_EMBEDDER_EXTRA_PARAMS")
 
 def _validate_provider(kind: str, provider: str, allowed: tuple) -> None:
     if provider not in allowed:
@@ -126,12 +129,31 @@ def _validate_provider(kind: str, provider: str, allowed: tuple) -> None:
 _validate_provider("LLM", DEFAULT_LLM_PROVIDER, BUNDLED_LLM_PROVIDERS)
 _validate_provider("Embedder", DEFAULT_EMBEDDER_PROVIDER, BUNDLED_EMBEDDER_PROVIDERS)
 
+def _parse_json_env(env_value, env_name):
+    """Parse a JSON environment variable into a dict."""
+    if not env_value:
+        return {}
+    try:
+        parsed = json.loads(env_value)
+        if not isinstance(parsed, dict):
+            raise ValueError(f"Must be a JSON object")
+        return parsed
+    except (json.JSONDecodeError, ValueError) as e:
+        logging.warning("Failed to parse %s: %s", env_name, e)
+        return {}
+
+
 # Each provider class reads its own api_key / base_url from the
 # environment. The server only sets provider + model.
-
 _llm_config = {"model": DEFAULT_LLM_MODEL, "temperature": 0.2}
-if DEFAULT_LLM_ENABLE_THINKING is not None:
-    _llm_config["enable_thinking"] = DEFAULT_LLM_ENABLE_THINKING.lower() == "true"
+_llm_config.update(_parse_json_env(_LLM_EXTRA_PARAMS, "MEM0_LLM_EXTRA_PARAMS"))
+
+_embedder_config = {
+    "model": DEFAULT_EMBEDDER_MODEL,
+    "embedding_dims": DEFAULT_EMBEDDING_DIMS,
+    "lmstudio_base_url": os.environ.get("LMSTUDIO_BASE_URL"),
+}
+_embedder_config.update(_parse_json_env(_EMBEDDER_EXTRA_PARAMS, "MEM0_EMBEDDER_EXTRA_PARAMS"))
 
 DEFAULT_CONFIG = {
     "version": "v1.1",
@@ -153,11 +175,7 @@ DEFAULT_CONFIG = {
     },
     "embedder": {
         "provider": DEFAULT_EMBEDDER_PROVIDER,
-        "config": {
-            "model": DEFAULT_EMBEDDER_MODEL,
-            "embedding_dims": DEFAULT_EMBEDDING_DIMS,
-            "lmstudio_base_url": os.environ.get("LMSTUDIO_BASE_URL"),
-        },
+        "config": _embedder_config,
     },
     "history_db_path": HISTORY_DB_PATH,
 }
