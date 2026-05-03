@@ -1,4 +1,5 @@
 import importlib
+import inspect
 from typing import Dict, Optional, Union
 
 from mem0.configs.embeddings.base import BaseEmbedderConfig
@@ -25,6 +26,16 @@ def load_class(class_type):
     module_path, class_name = class_type.rsplit(".", 1)
     module = importlib.import_module(module_path)
     return getattr(module, class_name)
+
+
+def _filter_kwargs(config_class, **kwargs):
+    """Only pass kwargs that the config class __init__ accepts."""
+    try:
+        sig = inspect.signature(config_class.__init__)
+        valid_params = set(sig.parameters.keys())
+        return {k: v for k, v in kwargs.items() if k in valid_params}
+    except (ValueError, TypeError):
+        return kwargs
 
 
 class LlmFactory:
@@ -80,11 +91,11 @@ class LlmFactory:
         # Handle configuration
         if config is None:
             # Create default config with kwargs
-            config = config_class(**kwargs)
+            config = config_class(**_filter_kwargs(config_class, **kwargs))
         elif isinstance(config, dict):
             # Merge dict config with kwargs
             config.update(kwargs)
-            config = config_class(**config)
+            config = config_class(**_filter_kwargs(config_class, **config))
         elif isinstance(config, BaseLlmConfig):
             # Convert base config to provider-specific config if needed
             if config_class != BaseLlmConfig:
@@ -101,7 +112,7 @@ class LlmFactory:
                     "http_client_proxies": config.http_client,
                 }
                 config_dict.update(kwargs)
-                config = config_class(**config_dict)
+                config = config_class(**_filter_kwargs(config_class, **config_dict))
             else:
                 # Use base config as-is
                 pass

@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import os
 import time
@@ -52,8 +53,8 @@ SENSITIVE_CONFIG_KEYS = {
 SKIPPED_REQUEST_LOG_PATHS = {"/api/health", "/docs", "/redoc", "/openapi.json"}
 SKIPPED_REQUEST_LOG_PREFIXES = ("/requests",)
 
-BUNDLED_LLM_PROVIDERS = ("openai", "anthropic", "gemini")
-BUNDLED_EMBEDDER_PROVIDERS = ("openai", "gemini")
+BUNDLED_LLM_PROVIDERS = ("openai", "anthropic", "gemini", "minimax", "deepseek", "lmstudio")
+BUNDLED_EMBEDDER_PROVIDERS = ("openai", "gemini", "lmstudio")
 
 
 def _warn_if_unconfigured() -> None:
@@ -105,10 +106,54 @@ POSTGRES_USER = os.environ.get("POSTGRES_USER", "postgres")
 POSTGRES_PASSWORD = os.environ.get("POSTGRES_PASSWORD", "postgres")
 POSTGRES_COLLECTION_NAME = os.environ.get("POSTGRES_COLLECTION_NAME", "memories")
 
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 HISTORY_DB_PATH = os.environ.get("HISTORY_DB_PATH", "/app/history/history.db")
+
+DEFAULT_LLM_PROVIDER = os.environ.get("MEM0_DEFAULT_LLM_PROVIDER", "openai")
 DEFAULT_LLM_MODEL = os.environ.get("MEM0_DEFAULT_LLM_MODEL", "gpt-4.1-nano-2025-04-14")
+DEFAULT_EMBEDDER_PROVIDER = os.environ.get("MEM0_DEFAULT_EMBEDDER_PROVIDER", "openai")
 DEFAULT_EMBEDDER_MODEL = os.environ.get("MEM0_DEFAULT_EMBEDDER_MODEL", "text-embedding-3-small")
+DEFAULT_EMBEDDING_DIMS = int(os.environ.get("MEM0_DEFAULT_EMBEDDING_DIMS", "1024"))
+
+_LLM_EXTRA_PARAMS = os.environ.get("MEM0_LLM_EXTRA_PARAMS")
+_EMBEDDER_EXTRA_PARAMS = os.environ.get("MEM0_EMBEDDER_EXTRA_PARAMS")
+
+def _validate_provider(kind: str, provider: str, allowed: tuple) -> None:
+    if provider not in allowed:
+        raise RuntimeError(
+            f"{kind} provider '{provider}' is not bundled. "
+            f"Bundled {kind.lower()} providers: {', '.join(allowed)}. "
+            f"Set MEM0_DEFAULT_{kind.upper()}_PROVIDER to a bundled provider "
+            "or extend BUNDLED_{kind.upper()}_PROVIDERS in server/main.py."
+        )
+
+_validate_provider("LLM", DEFAULT_LLM_PROVIDER, BUNDLED_LLM_PROVIDERS)
+_validate_provider("Embedder", DEFAULT_EMBEDDER_PROVIDER, BUNDLED_EMBEDDER_PROVIDERS)
+
+def _parse_json_env(env_value, env_name):
+    """Parse a JSON environment variable into a dict."""
+    if not env_value:
+        return {}
+    try:
+        parsed = json.loads(env_value)
+        if not isinstance(parsed, dict):
+            raise ValueError(f"Must be a JSON object")
+        return parsed
+    except (json.JSONDecodeError, ValueError) as e:
+        logging.warning("Failed to parse %s: %s", env_name, e)
+        return {}
+
+
+# Each provider class reads its own api_key / base_url from the
+# environment. The server only sets provider + model.
+_llm_config = {"model": DEFAULT_LLM_MODEL, "temperature": 0.2}
+_llm_config.update(_parse_json_env(_LLM_EXTRA_PARAMS, "MEM0_LLM_EXTRA_PARAMS"))
+
+_embedder_config = {
+    "model": DEFAULT_EMBEDDER_MODEL,
+    "embedding_dims": DEFAULT_EMBEDDING_DIMS,
+    "lmstudio_base_url": os.environ.get("LMSTUDIO_BASE_URL"),
+}
+_embedder_config.update(_parse_json_env(_EMBEDDER_EXTRA_PARAMS, "MEM0_EMBEDDER_EXTRA_PARAMS"))
 
 DEFAULT_CONFIG = {
     "version": "v1.1",
@@ -121,13 +166,17 @@ DEFAULT_CONFIG = {
             "user": POSTGRES_USER,
             "password": POSTGRES_PASSWORD,
             "collection_name": POSTGRES_COLLECTION_NAME,
+            "embedding_model_dims": DEFAULT_EMBEDDING_DIMS,
         },
     },
     "llm": {
-        "provider": "openai",
-        "config": {"api_key": OPENAI_API_KEY, "temperature": 0.2, "model": DEFAULT_LLM_MODEL},
+        "provider": DEFAULT_LLM_PROVIDER,
+        "config": _llm_config,
     },
-    "embedder": {"provider": "openai", "config": {"api_key": OPENAI_API_KEY, "model": DEFAULT_EMBEDDER_MODEL}},
+    "embedder": {
+        "provider": DEFAULT_EMBEDDER_PROVIDER,
+        "config": _embedder_config,
+    },
     "history_db_path": HISTORY_DB_PATH,
 }
 
@@ -416,8 +465,13 @@ def get_memory(memory_id: str, _auth=Depends(verify_auth)):
 def search_memories(search_req: SearchRequest, _auth=Depends(verify_auth)):
     """Search for memories based on a query."""
     try:
-        params = {k: v for k, v in search_req.model_dump().items() if v is not None and k != "query"}
-        return get_memory_instance().search(query=search_req.query, **params)
+        filters = {k: v for k, v in {"user_id": search_req.user_id, "run_id": search_req.run_id,
+                                       "agent_id": search_req.agent_id}.items() if v is not None}
+        if search_req.filters:
+            filters.update(search_req.filters)
+        params = {k: v for k, v in {"top_k": search_req.top_k, "threshold": search_req.threshold}.items()
+                  if v is not None}
+        return get_memory_instance().search(query=search_req.query, filters=filters, **params)
     except Exception:
         raise upstream_error()
 

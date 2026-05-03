@@ -70,9 +70,14 @@ echo "Password:   $PASSWORD"
 echo "API Key:    $API_KEY"
 echo ""
 
-if ! grep -qE '^(OPENAI|ANTHROPIC|GOOGLE)_API_KEY=.' .env 2>/dev/null; then
+_provider_keys() {
+  # Returns 0 (true) if any known LLM/embedder provider API key is found.
+  grep -qE '^(OPENAI|ANTHROPIC|GOOGLE|DEEPSEEK|MINIMAX|GROQ|TOGETHER|XAI|VERTEX|LMSTUDIO)_(API_KEY|BASE_URL)=' .env 2>/dev/null
+}
+
+if ! _provider_keys; then
   echo "!! No LLM provider API key set in server/.env."
-  echo "   Set OPENAI_API_KEY (or ANTHROPIC_API_KEY / GOOGLE_API_KEY), then:"
+  echo "   Set your provider key (e.g. OPENAI_API_KEY, DEEPSEEK_API_KEY, LMSTUDIO_BASE_URL), then:"
   echo "     docker compose up -d --force-recreate mem0"
   echo "   The curl below will return provider_auth_failed until you do."
   echo ""

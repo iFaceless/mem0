@@ -20,6 +20,7 @@ class DeepSeekConfig(BaseLlmConfig):
         top_k: int = 1,
         enable_vision: bool = False,
         vision_details: Optional[str] = "auto",
+        enable_thinking: Optional[bool] = None,
         http_client_proxies: Optional[dict] = None,
         # DeepSeek-specific parameters
         deepseek_base_url: Optional[str] = None,
@@ -36,6 +37,7 @@ class DeepSeekConfig(BaseLlmConfig):
             top_k: Top-k sampling parameter, defaults to 1
             enable_vision: Enable vision capabilities, defaults to False
             vision_details: Vision detail level, defaults to "auto"
+            enable_thinking: Whether to enable extended thinking mode, defaults to None
             http_client_proxies: HTTP client proxy settings, defaults to None
             deepseek_base_url: DeepSeek API base URL, defaults to None
         """
@@ -49,6 +51,7 @@ class DeepSeekConfig(BaseLlmConfig):
             top_k=top_k,
             enable_vision=enable_vision,
             vision_details=vision_details,
+            enable_thinking=enable_thinking,
             http_client_proxies=http_client_proxies,
         )
 

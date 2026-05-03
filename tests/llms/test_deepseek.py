@@ -157,3 +157,60 @@ def test_generate_response_without_response_format(mock_deepseek_client):
     call_kwargs = mock_deepseek_client.chat.completions.create.call_args[1]
     assert "response_format" not in call_kwargs
     assert response == "Why did the chicken cross the road?"
+
+
+def test_generate_response_with_thinking_disabled(mock_deepseek_client):
+    config = DeepSeekConfig(model="deepseek-chat", temperature=0.7, max_tokens=100, top_p=1.0, enable_thinking=False)
+    llm = DeepSeekLLM(config)
+    messages = [{"role": "user", "content": "Hello"}]
+
+    mock_response = Mock()
+    mock_response.choices = [Mock(message=Mock(content="Hi there!"))]
+    mock_deepseek_client.chat.completions.create.return_value = mock_response
+
+    llm.generate_response(messages)
+
+    mock_deepseek_client.chat.completions.create.assert_called_once_with(
+        model="deepseek-chat",
+        messages=messages,
+        temperature=0.7,
+        max_tokens=100,
+        top_p=1.0,
+        extra_body={"thinking": {"type": "disabled"}},
+    )
+
+
+def test_generate_response_with_thinking_enabled(mock_deepseek_client):
+    config = DeepSeekConfig(model="deepseek-chat", temperature=0.7, max_tokens=100, top_p=1.0, enable_thinking=True)
+    llm = DeepSeekLLM(config)
+    messages = [{"role": "user", "content": "Hello"}]
+
+    mock_response = Mock()
+    mock_response.choices = [Mock(message=Mock(content="Hi there!"))]
+    mock_deepseek_client.chat.completions.create.return_value = mock_response
+
+    llm.generate_response(messages)
+
+    mock_deepseek_client.chat.completions.create.assert_called_once_with(
+        model="deepseek-chat",
+        messages=messages,
+        temperature=0.7,
+        max_tokens=100,
+        top_p=1.0,
+        extra_body={"thinking": {"type": "enabled"}},
+    )
+
+
+def test_generate_response_without_thinking_config(mock_deepseek_client):
+    config = DeepSeekConfig(model="deepseek-chat", temperature=0.7, max_tokens=100, top_p=1.0)
+    llm = DeepSeekLLM(config)
+    messages = [{"role": "user", "content": "Hello"}]
+
+    mock_response = Mock()
+    mock_response.choices = [Mock(message=Mock(content="Hi there!"))]
+    mock_deepseek_client.chat.completions.create.return_value = mock_response
+
+    llm.generate_response(messages)
+
+    call_kwargs = mock_deepseek_client.chat.completions.create.call_args[1]
+    assert "extra_body" not in call_kwargs

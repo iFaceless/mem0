@@ -28,6 +28,7 @@ class DeepSeekLLM(LLMBase):
                 top_k=config.top_k,
                 enable_vision=config.enable_vision,
                 vision_details=config.vision_details,
+                enable_thinking=config.enable_thinking,
                 http_client_proxies=config.http_client,
             )
 
@@ -104,6 +105,11 @@ class DeepSeekLLM(LLMBase):
         if tools:
             params["tools"] = tools
             params["tool_choice"] = tool_choice
+
+        if self.config.enable_thinking is not None:
+            params["extra_body"] = {
+                "thinking": {"type": "enabled" if self.config.enable_thinking else "disabled"}
+            }
 
         response = self.client.chat.completions.create(**params)
         return self._parse_response(response, tools)

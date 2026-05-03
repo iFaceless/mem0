@@ -8,7 +8,7 @@ ENV PATH="/root/.local/bin:$PATH"
 
 # Copy requirements first for better caching
 COPY server/requirements.txt .
-RUN pip install -r requirements.txt
+RUN pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --retries 10
 
 # Install mem0 in editable mode using Poetry
 WORKDIR /app/packages
@@ -16,7 +16,7 @@ COPY pyproject.toml .
 COPY poetry.lock .
 COPY README.md .
 COPY mem0 ./mem0
-RUN pip install -e .[graph]
+RUN pip install -e .[graph] -i https://pypi.tuna.tsinghua.edu.cn/simple --retries 10
 
 # Return to app directory and copy server code
 WORKDIR /app
