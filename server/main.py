@@ -109,6 +109,7 @@ HISTORY_DB_PATH = os.environ.get("HISTORY_DB_PATH", "/app/history/history.db")
 
 DEFAULT_LLM_PROVIDER = os.environ.get("MEM0_DEFAULT_LLM_PROVIDER", "openai")
 DEFAULT_LLM_MODEL = os.environ.get("MEM0_DEFAULT_LLM_MODEL", "gpt-4.1-nano-2025-04-14")
+DEFAULT_LLM_ENABLE_THINKING = os.environ.get("MEM0_LLM_ENABLE_THINKING")
 DEFAULT_EMBEDDER_PROVIDER = os.environ.get("MEM0_DEFAULT_EMBEDDER_PROVIDER", "openai")
 DEFAULT_EMBEDDER_MODEL = os.environ.get("MEM0_DEFAULT_EMBEDDER_MODEL", "text-embedding-3-small")
 DEFAULT_EMBEDDING_DIMS = int(os.environ.get("MEM0_DEFAULT_EMBEDDING_DIMS", "1024"))
@@ -128,6 +129,10 @@ _validate_provider("Embedder", DEFAULT_EMBEDDER_PROVIDER, BUNDLED_EMBEDDER_PROVI
 # Each provider class reads its own api_key / base_url from the
 # environment. The server only sets provider + model.
 
+_llm_config = {"model": DEFAULT_LLM_MODEL, "temperature": 0.2}
+if DEFAULT_LLM_ENABLE_THINKING is not None:
+    _llm_config["enable_thinking"] = DEFAULT_LLM_ENABLE_THINKING.lower() == "true"
+
 DEFAULT_CONFIG = {
     "version": "v1.1",
     "vector_store": {
@@ -144,7 +149,7 @@ DEFAULT_CONFIG = {
     },
     "llm": {
         "provider": DEFAULT_LLM_PROVIDER,
-        "config": {"model": DEFAULT_LLM_MODEL, "temperature": 0.2},
+        "config": _llm_config,
     },
     "embedder": {
         "provider": DEFAULT_EMBEDDER_PROVIDER,
